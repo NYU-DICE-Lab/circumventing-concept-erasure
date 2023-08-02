@@ -18,7 +18,7 @@ Optional: Get used to the [🤗Textual Inversion](https://github.com/huggingface
 ## Training Guide
 We provide Concept Inversion code for the following methods:
 - [Erased Stable Diffusion (ESD)](https://github.com/rohitgandikota/erasing) in the `/esd` folder.
-- [Forget-Me-Not (FMN)](https://github.com/SHI-Labs/Forget-Me-Not/blob/main/README.md) in the `/fmn` folder.
+- [Forget-Me-Not (FMN)](https://github.com/SHI-Labs/Forget-Me-Not) in the `/fmn` folder.
 - [Selective Amnesia (SA)](https://github.com/clear-nus/selective-amnesia) in the `/sa` folder.
 - [Negative Prompt (NP)](https://github.com/AUTOMATIC1111/stable-diffusion-webui/wiki/Negative-prompt) in the `/np` folder.
 - [Safe Latent Diffusion (SLD)](https://github.com/ml-research/safe-latent-diffusion) in the `/sld` folder.
