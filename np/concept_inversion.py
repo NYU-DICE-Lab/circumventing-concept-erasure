@@ -682,7 +682,7 @@ def main():
         gradient_accumulation_steps=args.gradient_accumulation_steps,
         mixed_precision=args.mixed_precision,
         log_with=args.report_to,
-        logging_dir=logging_dir,
+        project_dir=logging_dir,
         project_config=accelerator_project_config,
     )
 
@@ -998,11 +998,12 @@ def main():
 
                 if args.i2p:
                     model_pred_uncond, model_pred_orig, model_pred_neg, model_pred_text = model_pred.chunk(4)
+                    model_target = model_pred_uncond + args.guidance_scale * (model_pred_orig - model_pred_uncond)
+                    model_pred = model_pred_neg + args.guidance_scale * (model_pred_text - model_pred_neg)
                 else:
                     model_pred_uncond, model_pred_neg, model_pred_text = model_pred.chunk(3)
-           
-                model_target = model_pred_uncond + args.guidance_scale * (model_pred_orig - model_pred_uncond)
-                model_pred = model_pred_neg + args.guidance_scale * (model_pred_text - model_pred_neg)
+                    model_target = model_pred_uncond + args.guidance_scale * (model_pred_neg - model_pred_uncond)
+                    model_pred = model_pred_neg + args.guidance_scale * (model_pred_text - model_pred_neg)
 
                 loss = F.mse_loss(model_pred.float(), model_target.float(), reduction="mean")
 

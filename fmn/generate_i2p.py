@@ -11,7 +11,6 @@ def parse_args():
 
     parser.add_argument("--output_dir", type=str, help="Output directory")
     parser.add_argument("--model_path", type=str, help="Path to model checkpoint", default="CompVis/stable-diffusion-v1-4")
-    parser.add_argument("--esd_checkpoint", type=str, help="Path to ESD checkpoint", default="")
 
     args = parser.parse_args()
     return args

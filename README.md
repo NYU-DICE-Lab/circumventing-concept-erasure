@@ -1,12 +1,29 @@
 # Circumventing Concept Erasure Methods in Text-to-Image Models
 
+###  [Project Website](https://nyu-dice-lab.github.io/CCE/) | [Arxiv Preprint]() <br>
+
+<div align='center'>
+<img src = 'images/headline.png'>
+</div>
+
 ## Starting Guide
-To get started, install the requirements
+To get started, create a new conda environment and install the required packages:
 
-Get used to diffusers code
+```bash
+conda create -f environment.yml
+```
 
-## Training
-Please refer to each folder for instructions on how to perform Concept Inversion, which is designed to be self-contained.
+Optional: Get used to the [🤗Textual Inversion](https://github.com/huggingface/diffusers/tree/main/examples/textual_inversion) GitHub repository.
+
+## Training Guide
+We provide Concept Inversion code for the following methods:
+- [Erased Stable Diffusion (ESD)](https://github.com/rohitgandikota/erasing) in the `/esd` folder.
+- [Forget-Me-Not (FMN)](https://github.com/SHI-Labs/Forget-Me-Not/blob/main/README.md) in the `/fmn` folder.
+- [Selective Amnesia (SA)](https://github.com/clear-nus/selective-amnesia) in the `/sa` folder.
+- Negative Prompt (NP) in the `/np` folder.
+- [Safe Latent Diffusion (SLD)](https://github.com/ml-research/safe-latent-diffusion) in the `/sld` folder.
+
+Please refer to each folder for additional instructions, which is designed to be self-contained.
 
 ## Acknowledgements
-We would like to thank
+We would like to thank the authors of [🤗Difusers](https://github.com/huggingface/diffusers/)for relesing their helpful codebases.

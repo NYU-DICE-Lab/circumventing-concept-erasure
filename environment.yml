@@ -142,3 +142,4 @@ dependencies:
       - accelerate==0.21.0
       - psutil==5.9.5
       - torch==1.11.0
+      - torchvision

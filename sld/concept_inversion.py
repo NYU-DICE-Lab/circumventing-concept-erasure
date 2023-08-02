@@ -1,4 +1,4 @@
-"""Code adapted from: https://github.com/huggingface/diffusers/tree/main/examples/textual_inversion"""
+"""Code adapted from: https://github.com/huggingface/diffusers/tree/main/examples/textual_inversion and https://github.com/ml-research/safe-latent-diffusion"""
 
 import argparse
 import logging
@@ -395,15 +395,8 @@ def parse_args():
         "--enable_xformers_memory_efficient_attention", action="store_true", help="Whether or not to use xformers."
     )
 
-    #esd arguments
-    parser.add_argument('--esd_checkpoint', type=str, default="", help='esd checkpoint')
-
     #safety concept arguments
-    parser.add_argument('--safety_concept', type=str, default="Thomas Kinkade", help='safety concept')
-
-    #anchor arguments
-    parser.add_argument('--anchor_text', type=str, default="", help='anchor text')
-    parser.add_argument('--anchor_weight', type=float, default=0.01, help='anchor weight')
+    parser.add_argument('--safety_concept', type=str, default="", help='safety concept')
 
     #number of images in training set
     parser.add_argument('--num_train_images', type=int, default=1000, help='number of images in training set')
@@ -411,6 +404,18 @@ def parse_args():
     #i2p arguments
     parser.add_argument('--i2p', action='store_true', help='i2p dataset')
     parser.add_argument('--i2p_metadata_path', type=str, default="", help='i2p metadata path')
+    
+    #sld arguments 
+    parser.add_argument('--guidance_scale', type=float, default=7.5, help='guidance scale')
+    parser.add_argument('--sld_warmup_steps', type=int, default=0, help='sld warmup steps')
+    parser.add_argument('--sld_guidance_scale', type=float, default=5000, help='sld guidance scale')
+    parser.add_argument('--sld_threshold', type=float, default=1.0, help='sld threshold')
+    parser.add_argument('--sld_momentum_scale', type=float, default=0.5, help='sld momentum scale')
+    parser.add_argument('--sld_mom_beta', type=float, default=0.7, help='sld momentum beta')
+    
+    parser.add_argument('--timestep_range', type=int, default=50, help='timestep range')
+    parser.add_argument('--timestep_count', type=int, default=13, help='timestep count')
+    
 
     args = parser.parse_args()
     env_local_rank = int(os.environ.get("LOCAL_RANK", -1))
@@ -475,29 +480,9 @@ imagenet_style_templates_small = [
     "a large painting in the style of {}",
 ]
 
-# person_templates_small = [
-#     "{}",
-#     "a photo of {}",
-#     "photo realistic portrait of {} with {}, 32k, highly detailed, bokah, centered in frame, facing camera, symmetrical face, ideal human, 85mm lens,f8, photography, ultra details, natural light, dark background, photo",
-#     "a rendering of {} centered in frame, facing camera",
-#     "a cropped photo of {}",
-#     "a close-up photo of {}, 85mm lens, f8, photography",
-#     "a headshot of {}",
-#     "the face of {}",
-#     "a bright photo of {}",
-#     "a photo of {} smiling",
-#     "{}, 85mm lens,f8, photography, ultra details, natural light, dark background, photo",
-#     "a good photo of {}",
-#     "a photo of {} looking at the camera",
-#     "a close-up photo of {}",
-#     "a rendition of {}",
-#     "a mid body photo of {} facing camera",
-#     "a beautiful photo of {} facing camera",
-#     "a cool photo of {}"
-# ]
-
 person_templates_small = [
-    "a photo portrait of {}"
+    "a photo portrait of {}",
+    "a DSLR photo portrait of {}",
 ]
 
 class TextualInversionDataset(Dataset):
@@ -642,13 +627,6 @@ class TextualInversionDataset_I2P(Dataset):
             "lanczos": PIL_INTERPOLATION["lanczos"],
         }[interpolation]
 
-        # if learnable_property == "object":
-        #     self.templates = imagenet_templates_small
-        # elif learnable_property == "style":
-        #     self.templates = imagenet_style_templates_small
-        # elif learnable_property == "person":
-        #     self.templates = person_templates_small
-        # self.templates = imagenet_style_templates_small if learnable_property == "style" else imagenet_templates_small
         self.flip_transform = transforms.RandomHorizontalFlip(p=self.flip_p)
 
     def __len__(self):
@@ -662,7 +640,6 @@ class TextualInversionDataset_I2P(Dataset):
             image = image.convert("RGB")
 
         placeholder_string = self.placeholder_token
-        # text = random.choice(self.templates).format(placeholder_string)
 
         text = self.captions[i % self.num_images].format(placeholder_string)
         text_original = self.captions_original[i % self.num_images]
@@ -675,13 +652,6 @@ class TextualInversionDataset_I2P(Dataset):
             return_tensors="pt",
         ).input_ids[0]
 
-        # example["input_ids_original"] = self.tokenizer(
-        #     text_original,
-        #     padding="max_length",
-        #     truncation=True,
-        #     max_length=self.tokenizer.model_max_length,
-        #     return_tensors="pt",
-        # ).input_ids[0]
         example["text_original"] = text_original
 
         # default to score-sde preprocessing
@@ -718,7 +688,7 @@ def main():
         gradient_accumulation_steps=args.gradient_accumulation_steps,
         mixed_precision=args.mixed_precision,
         log_with=args.report_to,
-        logging_dir=logging_dir,
+        project_dir=logging_dir,
         project_config=accelerator_project_config,
     )
 
@@ -771,9 +741,6 @@ def main():
     )
 
     noise_scheduler.set_timesteps(1000)
-
-    if args.esd_checkpoint != "":
-        unet.load_state_dict(torch.load(args.esd_checkpoint))
 
     # Add the placeholder token in tokenizer
     placeholder_tokens = [args.placeholder_token]
@@ -859,7 +826,6 @@ def main():
         eps=args.adam_epsilon,
     )
 
-    # Dataset and DataLoaders creation:
     # Dataset and DataLoaders creation:
     if args.i2p:
         train_dataset = TextualInversionDataset_I2P(
@@ -988,13 +954,12 @@ def main():
     orig_embeds_params = accelerator.unwrap_model(text_encoder).get_input_embeddings().weight.data.clone()
 
     #SLD modification
-    enable_safety_guidance = True
-    guidance_scale = 7.5
-    sld_warmup_steps = 0
-    sld_guidance_scale = 5000
-    sld_threshold = 1.0
-    sld_momentum_scale = 0.5
-    sld_mom_beta = 0.7
+    guidance_scale = args.guidance_scale
+    sld_warmup_steps = args.sld_warmup_steps
+    sld_guidance_scale = args.sld_guidance_scale
+    sld_threshold = args.sld_threshold
+    sld_momentum_scale = args.sld_momentum_scale
+    sld_mom_beta = args.sld_mom_beta
     
     
     for epoch in range(first_epoch, args.num_train_epochs):
@@ -1015,19 +980,30 @@ def main():
                 noise = torch.randn_like(latents)
                 bsz = latents.shape[0]
                 # Sample a random timestep for each image
-                timesteps = torch.randint(50, noise_scheduler.config.num_train_timesteps, (bsz,), device=latents.device)
-
-                #create array of timesteps from 0 to timesteps
-                # timesteps_tensor = torch.arange(0, timesteps.item(), device=latents.device)
+                
 
                 def unique_randint(n, low, high):
                     if high - low < n:
                         raise ValueError("Range size is less than the number of unique elements required.")
                     else:
                         return torch.randperm(high - low)[:n] + low
-
-                # timesteps_tensor = unique_randint(17, timesteps.item() - 50 , timesteps.item())
-                timesteps_tensor = unique_randint(26, timesteps.item() - 75 , timesteps.item())
+                
+                '''For a single A100 GPU, this seems to be the max that can be done:        
+                if args.mixed_precision == "no":
+                    #On a single A100 GPU, 
+                    timesteps = torch.randint(50, noise_scheduler.config.num_train_timesteps, (bsz,), device=latents.device)
+                    timesteps_tensor = unique_randint(13, timesteps.item() - 50 , timesteps.item())
+                    
+                    timesteps =  torch.randint(args.timestep_range, noise_scheduler.config.num_train_timesteps, (bsz,), device=latents.device)
+                    timesteps_tensor = unique_randint(args.timestep_count, timesteps.item() - args.timestep_range , timesteps.item())
+                elif args.mixed_precision == "fp16":
+                    timesteps = torch.randint(75, noise_scheduler.config.num_train_timesteps, (bsz,), device=latents.device)
+                    timesteps_tensor = unique_randint(26, timesteps.item() - 75 , timesteps.item())
+                '''  
+                
+                timesteps =  torch.randint(args.timestep_range, noise_scheduler.config.num_train_timesteps, (bsz,), device=latents.device) #choosing upper n
+                timesteps_tensor = unique_randint(args.timestep_count, timesteps.item() - args.timestep_range , timesteps.item()) #sample interval [n,...,m]
+                    
                 #move to device
                 timesteps_tensor = timesteps_tensor.to(latents.device)
 
@@ -1036,46 +1012,22 @@ def main():
 
                 # Get the text embedding for conditioning
                 encoder_hidden_states = text_encoder(batch["input_ids"])[0].to(dtype=weight_dtype)
-
-                tokenized_placeholder_token = tokenizer(args.placeholder_token,  max_length=tokenizer.model_max_length, padding="max_length", truncation=True, return_tensors="pt").input_ids.to(latents.device)
-                tokenized_anchor = tokenizer(args.anchor_text,  max_length=tokenizer.model_max_length, padding="max_length", truncation=True, return_tensors="pt").input_ids.to(latents.device)
-
-                encoder_hidden_states_placeholder_token = text_encoder(tokenized_placeholder_token)[1].to(dtype=weight_dtype)
-                encoder_hidden_states_anchor = text_encoder(tokenized_anchor)[1].to(dtype=weight_dtype)
             
                 with torch.no_grad():
-                    # uncond_tokens = [""]
-                    # uncond_input = tokenizer(
-                    #     uncond_tokens,
-                    #     padding="max_length",
-                    #     truncation=True,
-                    #     max_length=tokenizer.model_max_length,
-                    #     return_tensors="pt",
-                    # ).to(latents.device)
-                    # uncond_embeddings = text_encoder(uncond_input.input_ids)[0].to(dtype=weight_dtype)
-
-                    # safety_text_concept = [args.safety_concept]
-                    # safety_concept_input = tokenizer(
-                    #     safety_text_concept,
-                    #     padding="max_length",
-                    #     truncation=True,
-                    #     max_length=tokenizer.model_max_length,
-                    #     return_tensors="pt",
-                    # ).to(latents.device)
-                    # safety_embeddings = text_encoder(safety_concept_input.input_ids)[0].to(dtype=weight_dtype)
-
-                    uncond_tokens = [""] + batch["text_original"] + [args.safety_concept]
-                    uncond_input = tokenizer(
-                        uncond_tokens,
+                    if args.i2p:
+                        tokens = [""] + batch["text_original"] + [args.safety_concept]
+                    else:
+                        tokens = [""] + [args.safety_concept]
+                    input = tokenizer(
+                        tokens,
                         padding="max_length",
                         truncation=True,
                         max_length=tokenizer.model_max_length,
                         return_tensors="pt",
                     ).to(latents.device)
-                    uncond_embeddings = text_encoder(uncond_input.input_ids)[0].to(dtype=weight_dtype)
+                    embeddings = text_encoder(input.input_ids)[0].to(dtype=weight_dtype)
 
-                # encoder_hidden_states = torch.cat([uncond_embeddings, encoder_hidden_states, safety_embeddings])
-                encoder_hidden_states = torch.cat([uncond_embeddings, encoder_hidden_states])
+                encoder_hidden_states = torch.cat([embeddings, encoder_hidden_states])
 
                 safety_momentum = None
                 #iterate through each element in timesteps_tensor
@@ -1088,83 +1040,60 @@ def main():
                     noisy_latents = noise_scheduler.add_noise(latents, noise, t)
 
                     do_classifier_free_guidance = guidance_scale > 1.0
-                    # noisy_latents = torch.cat([noisy_latents] * (3 if enable_safety_guidance else 2)) \
-                    #     if do_classifier_free_guidance else latents
-
-                    #hard code for i2p
-                    noisy_latents = torch.cat([noisy_latents] * (4 if enable_safety_guidance else 2)) \
-                        if do_classifier_free_guidance else latents
+                    if args.i2p:
+                        noisy_latents = torch.cat([noisy_latents] * 4) if do_classifier_free_guidance else latents
+                    else:
+                        noisy_latents = torch.cat([noisy_latents] * 3) \
+                            if do_classifier_free_guidance else latents
+                    
 
                     # Predict the noise residual
-                    # model_pred = unet(noisy_latents, timesteps, encoder_hidden_states).sample
                     model_pred = unet(noisy_latents, t, encoder_hidden_states).sample
 
                     # perform guidance
                     if do_classifier_free_guidance:
-                        # model_pred_out = model_pred.chunk((3 if enable_safety_guidance else 2))
-                        # model_pred_uncond, model_pred_text = model_pred_out[0], model_pred_out[1]
-
-                        model_pred_out = model_pred.chunk((4 if enable_safety_guidance else 2))
-                        # model_pred_uncond, model_pred_text, model_pred_true_concept = model_pred_out[0], model_pred_out[1], model_pred_out[2]
+                        if args.i2p:
+                            model_pred_out = model_pred.chunk(4)
+                            model_pred_uncond, model_pred_orig, model_pred_safety_concept, model_pred_text = model_pred_out[0], model_pred_out[1], model_pred_out[2], model_pred_out[3]
+                        else:
+                            model_pred_out = model_pred.chunk(3)
+                            model_pred_uncond, model_pred_safety_concept, model_pred_text  = model_pred_out[0], model_pred_out[1], model_pred_out[2]                    
                         
-                        model_pred_uncond, model_pred_orig, model_pred_safety_concept, model_pred_text = model_pred_out[0], model_pred_out[1], model_pred_out[2], model_pred_out[3]
-
                         # default classifier free guidance
                         noise_guidance = (model_pred_text - model_pred_uncond)
 
                         # Perform SLD guidance
-                        if enable_safety_guidance:
-                            if safety_momentum is None:
-                                safety_momentum = torch.zeros_like(noise_guidance)
-                            # model_pred_safety_concept = model_pred_out[2]
-                            # model_pred_safety_concept = model_pred_out[2]
-                            
-                            # Equation 6
-                            scale = torch.clamp(
-                                torch.abs((model_pred_text - model_pred_safety_concept)) * sld_guidance_scale, max=1.)
+                        if safety_momentum is None:
+                            safety_momentum = torch.zeros_like(noise_guidance)
+                        
+                        # Equation 6
+                        scale = torch.clamp(
+                            torch.abs((model_pred_text - model_pred_safety_concept)) * sld_guidance_scale, max=1.)
 
-                            # Equation 6
-                            safety_concept_scale = torch.where(
-                                (model_pred_text - model_pred_safety_concept) >= sld_threshold,
-                                torch.zeros_like(scale), scale)
+                        # Equation 6
+                        safety_concept_scale = torch.where(
+                            (model_pred_text - model_pred_safety_concept) >= sld_threshold,
+                            torch.zeros_like(scale), scale)
 
-                            # Equation 4
-                            model_guidance_safety = torch.mul(
-                                (model_pred_safety_concept - model_pred_uncond), safety_concept_scale)
+                        # Equation 4
+                        model_guidance_safety = torch.mul(
+                            (model_pred_safety_concept - model_pred_uncond), safety_concept_scale)
 
-                            # Equation 7
-                            model_guidance_safety = model_guidance_safety + sld_momentum_scale * safety_momentum
+                        # Equation 7
+                        model_guidance_safety = model_guidance_safety + sld_momentum_scale * safety_momentum
 
-                            # Equation 8
-                            safety_momentum = sld_mom_beta * safety_momentum + (1 - sld_mom_beta) * model_guidance_safety
+                        # Equation 8
+                        safety_momentum = sld_mom_beta * safety_momentum + (1 - sld_mom_beta) * model_guidance_safety
 
-                            if step >= sld_warmup_steps: # Warmup
-                                noise_guidance = noise_guidance - model_guidance_safety
-                            # noise_guidance = noise_guidance - model_guidance_safety
-                            
-                        model_pred = model_pred_uncond + guidance_scale * noise_guidance
-                        model_target = model_pred_uncond + guidance_scale * (model_pred_orig - model_pred_uncond)
-
-                '''
-                model_pred.shape [1, 4, 64, 64]
-                noisy_latents.shape [1, 4, 64, 64]
-                encoder_hidden_states.shape [1, 77, 768]
-                '''
-
-                # Get the target for loss depending on the prediction type
-                if noise_scheduler.config.prediction_type == "epsilon":
-                    target = noise
-                elif noise_scheduler.config.prediction_type == "v_prediction":
-                    # target = noise_scheduler.get_velocity(latents, noise, timesteps)
-                    target = noise_scheduler.get_velocity(latents, noise, t)
-                else:
-                    raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
-
-                # loss = F.mse_loss(model_pred.float(), target.float(), reduction="mean") + args.anchor_weight*controlled_loss(cosine_similarity, lower=0.1, upper=0.3).mean()
-
-                # loss = F.mse_loss(model_pred_text.float(), target.float(), reduction="mean") - 0.3*F.mse_loss(model_pred_text.float(), model_pred_safety_concept.float(), reduction="mean")
-
-                # loss = F.mse_loss(model_pred.float(), target.float(), reduction="mean") + args.anchor_weight*controlled_loss(cosine_similarity, lower=0.1, upper=0.3).mean()
+                        if step >= sld_warmup_steps: # Warmup
+                            noise_guidance = noise_guidance - model_guidance_safety
+                        
+                        if args.i2p:                            
+                            model_pred = model_pred_uncond + guidance_scale * noise_guidance
+                            model_target = model_pred_uncond + guidance_scale * (model_pred_orig - model_pred_uncond)
+                        else:
+                            model_pred = model_pred_uncond + guidance_scale * noise_guidance
+                            model_target = model_pred_uncond + guidance_scale * (model_pred_safety_concept - model_pred_uncond)
 
                 loss = F.mse_loss(model_pred.float(), model_target.float(), reduction="mean")
 

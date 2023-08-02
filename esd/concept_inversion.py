@@ -394,6 +394,9 @@ def parse_args():
     parser.add_argument(
         "--enable_xformers_memory_efficient_attention", action="store_true", help="Whether or not to use xformers."
     )
+    
+    #esd arguments
+    parser.add_argument("--esd_checkpoint", type=str, default="", help="checkpoint for esd")
 
     #number of images in training set
     parser.add_argument('--num_train_images', type=int, default=1000, help='number of images in training set')
