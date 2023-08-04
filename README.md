@@ -1,6 +1,6 @@
 # Circumventing Concept Erasure Methods in Text-to-Image Models
 
-###  [Project Website](https://nyu-dice-lab.github.io/CCE/) | [Arxiv Preprint]() <br>
+###  [Project Website](https://nyu-dice-lab.github.io/CCE/) | [Arxiv Preprint](https://arxiv.org/abs/2308.01508) <br>
 
 <div align='center'>
 <img src = 'images/headline.png'>
