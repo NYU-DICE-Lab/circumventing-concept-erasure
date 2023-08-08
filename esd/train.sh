@@ -1,7 +1,7 @@
 export MODEL_NAME="CompVis/stable-diffusion-v1-4"
-export DATA_DIR="/data/mp5847_dataset/i2p_esd_sd_1.4_repitition=1_correctly_classified-num_train_images=382-train_batch_size=1-max_train_steps=382-learning_rate=5.0e-03-sd_v1.4-penalty=0.0_fp16/train"
+export DATA_DIR=""
 export OUTPUT_DIR="./"
-export ESD_CKPT="/data/mp5847_dataset/esd_checkpoints/diffusers-AjinDemiHuman-ESDx1-UNET.pt"
+export ESD_CKPT="diffusers-AjinDemiHuman-ESDx1-UNET.pt"
 
 accelerate launch concept_inversion.py \
         --pretrained_model_name_or_path=$MODEL_NAME \
@@ -21,4 +21,4 @@ accelerate launch concept_inversion.py \
         --num_train_images=25 \
         --esd_checkpoint=$ESD_CKPT \
         --i2p \
-        --i2p_metadata_path="/data/mp5847_dataset/i2p_esd_sd_1.4_repitition=1_correctly_classified-num_train_images=382-train_batch_size=1-max_train_steps=382-learning_rate=5.0e-03-sd_v1.4-penalty=0.0_fp16/metadata.json"
+        --i2p_metadata_path="metadata.json"
