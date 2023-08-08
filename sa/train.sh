@@ -1,5 +1,5 @@
 export MODEL_NAME="CompVis/stable-diffusion-v1-4"
-export DATA_DIR="/data/mp5847_dataset/i2p_esd_sd_1.4_repitition=1_correctly_classified-num_train_images=382-train_batch_size=1-max_train_steps=382-learning_rate=5.0e-03-sd_v1.4-penalty=0.0_fp16/train"
+export DATA_DIR=""
 export OUTPUT_DIR="./"
 
 accelerate launch concept_inversion.py \
