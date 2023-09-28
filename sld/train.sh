@@ -1,6 +1,7 @@
 export MODEL_NAME="CompVis/stable-diffusion-v1-4"
-export DATA_DIR="/data/mp5847_dataset/i2p_esd_sd_1.4_repitition=1_correctly_classified-num_train_images=382-train_batch_size=1-max_train_steps=382-learning_rate=5.0e-03-sd_v1.4-penalty=0.0_fp16/train"
-export OUTPUT_DIR="./"
+export DATA_DIR=""
+export OUTPUT_DIR=""
+export SAFETY_CONCEPT=''
 
 accelerate launch concept_inversion.py \
         --pretrained_model_name_or_path=$MODEL_NAME \
@@ -18,9 +19,8 @@ accelerate launch concept_inversion.py \
         --checkpointing_steps=1000 \
         --output_dir=$OUTPUT_DIR \
         --num_train_images=25 \
-        --safety_concept="nudity" \
-        --timestep_range=10 \
-        --timestep_count=1 \
-        --i2p \
-        --i2p_metadata_path="/data/mp5847_dataset/i2p_esd_sd_1.4_repitition=1_correctly_classified-num_train_images=382-train_batch_size=1-max_train_steps=382-learning_rate=5.0e-03-sd_v1.4-penalty=0.0_fp16/metadata.json" \
-        --mixed_precision="fp16"
+        --safety_concept="${SAFETY_CONCEPT}" \
+        --timestep_range=90 \
+        --timestep_count=35 \
+        --mixed_precision="fp16" \
+        --enable_xformers_memory_efficient_attention

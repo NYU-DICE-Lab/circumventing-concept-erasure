@@ -15,6 +15,9 @@ def parse_args():
     parser.add_argument("--prompt", type=str, help="Prompt for image generation")
     parser.add_argument("--mode", type=str, help="Mode for image generation", choices=["train","test"], default="train")
     parser.add_argument("--num_train_images", type=int, help="Number of images to generate for training", default=1000)
+    parser.add_argument("--safety_concept", type=str, help="Text for negative prompt", default="")
+    parser.add_argument("--sld_config", type=str, help="SLD config", default="none", choices=["none", "weak", "medium", "strong", "max"])
+
     args = parser.parse_args()
     return args
 
