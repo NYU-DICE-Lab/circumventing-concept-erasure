@@ -19,4 +19,6 @@ accelerate launch concept_inversion.py \
         --checkpointing_steps=5000 \
         --output_dir=$OUTPUT_DIR \
         --num_train_images=25 \
-        --safety_concept="${SAFETY_CONCEPT}"
+        --safety_concept="${SAFETY_CONCEPT}" \
+        --mixed_precision="fp16" \
+        --enable_xformers_memory_efficient_attention

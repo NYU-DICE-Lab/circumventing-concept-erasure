@@ -48,7 +48,7 @@ if __name__ == "__main__":
         os.makedirs(args.output_dir, exist_ok=True)
         os.makedirs(os.path.join(args.output_dir), exist_ok=True)
 
-        pipe = StableDiffusionPipeline.from_pretrained(args.model_path, torch_dtype=torch.float16).to(device)
+        pipe = StableDiffusionPipeline.from_pretrained(args.model_path, safety_checker=None, torch_dtype=torch.float16).to(device)
 
         for i in range(args.num_train_images):
             while True:

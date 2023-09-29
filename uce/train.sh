@@ -1,6 +1,7 @@
 export MODEL_NAME="CompVis/stable-diffusion-v1-4"
 export DATA_DIR=""
 export OUTPUT_DIR=""
+export AC_CKPT=""
 
 accelerate launch concept_inversion.py \
         --pretrained_model_name_or_path=$MODEL_NAME \
@@ -8,7 +9,7 @@ accelerate launch concept_inversion.py \
         --learnable_property="style" \
         --placeholder_token="<art-style>" --initializer_token="art" \
         --resolution=512 \
-        --train_batch_size=1 \
+        --train_batch_size=4 \
         --gradient_accumulation_steps=4 \
         --max_train_steps=5000 \
         --learning_rate=5.0e-03 --scale_lr \
@@ -18,5 +19,7 @@ accelerate launch concept_inversion.py \
         --checkpointing_steps=5000 \
         --output_dir=$OUTPUT_DIR \
         --num_train_images=25 \
+        --ac_checkpoint=$ESD_CKPT \
         --mixed_precision="fp16" \
         --enable_xformers_memory_efficient_attention
+       

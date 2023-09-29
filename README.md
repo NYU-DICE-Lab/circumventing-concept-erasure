@@ -1,4 +1,4 @@
-# Circumventing Concept Erasure Methods in Text-to-Image Models
+# Circumventing Concept Erasure Methods For Text-to-Image Models
 
 ###  [Project Website](https://nyu-dice-lab.github.io/CCE/) | [Arxiv Preprint](https://arxiv.org/abs/2308.01508) <br>
 

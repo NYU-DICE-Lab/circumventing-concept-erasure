@@ -12,6 +12,7 @@ def parse_args():
     parser.add_argument("--output_dir", type=str, help="Output directory")
     parser.add_argument("--model_path", type=str, help="Path to model checkpoint", default="CompVis/stable-diffusion-v1-4")
     parser.add_argument("--esd_checkpoint", type=str, help="Path to ESD checkpoint", default="")
+    parser.add_argument("--special_token", type=str, help="Special token for image generation", default="")
 
     args = parser.parse_args()
     return args
@@ -37,7 +38,10 @@ if __name__ == "__main__":
 
     count = 0
     for item in data:
-        prompt = [item["prompt"]]
+        if args.special_token != "":
+            prompt = [item["prompt"]]
+        else:
+            prompt = [args.special_token + " " + item["prompt"]
         seed = item["sd_seed"]
 
         gen = torch.Generator(device)

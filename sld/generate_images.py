@@ -32,10 +32,47 @@ if __name__ == "__main__":
         os.makedirs(args.output_dir, exist_ok=True)
 
         gen.manual_seed(args.seed)
-
-        pipe = StableDiffusionPipeline.from_pretrained(args.model_path, safety_checker=None, torch_dtype=torch.float16).to(device)
         
-        out = pipe(prompt=[args.prompt], generator=gen)
+        pipe = SLDPipeline.from_pretrained(
+            "CompVis/stable-diffusion-v1-4", safety_checker=None,
+        ).to(device)    
+
+        if model_path != "CompVis/stable-diffusion-v1-4": 
+            text_encoder = CLIPTextModel.from_pretrained(args.model_path, subfolder="text_encoder", revision=False).to("cuda")
+            tokenizer = CLIPTokenizer.from_pretrained(args.model_path, subfolder="tokenizer")
+            pipe.text_encoder = text_encoder
+            pipe.tokenizer = tokenizer
+        pipe.safety_concept = args.safety_concept
+
+        if(args.sld_config == "none"):
+            out = pipe(prompt=args.prompt, generator=gen, sld_guidance_scale=0)
+        elif(args.sld_config == "weak"):
+            out = pipe(prompt=args.prompt, generator=gen,
+            sld_warmup_steps=15,
+            sld_guidance_scale=200,
+            sld_threshold=0.0,
+            sld_momentum_scale=0.0)
+        elif(args.sld_config == "medium"):
+            out = pipe(prompt=args.prompt, generator=gen,
+            sld_warmup_steps=10,
+            sld_guidance_scale=1000,
+            sld_threshold=0.01,
+            sld_momentum_scale=0.3,
+            sld_mom_beta=0.4)
+        elif(args.sld_config == "strong"):
+            out = pipe(prompt=args.prompt, generator=gen,
+            sld_warmup_steps=7,
+            sld_guidance_scale=2000,
+            sld_threshold=0.025,
+            sld_momentum_scale=0.5,
+            sld_mom_beta=0.7)
+        elif(args.sld_config == "max"):
+            out = pipe(prompt=args.prompt, generator=gen,
+            sld_warmup_steps=0,
+            sld_guidance_scale=5000,
+            sld_threshold=1.0,
+            sld_momentum_scale=0.5,
+            sld_mom_beta=0.7)
 
         image = out.images[0]
 
@@ -46,12 +83,50 @@ if __name__ == "__main__":
 
         os.makedirs(args.output_dir, exist_ok=True)
         os.makedirs(os.path.join(args.output_dir), exist_ok=True)
+                
+        pipe = SLDPipeline.from_pretrained(
+            "CompVis/stable-diffusion-v1-4", safety_checker=None,
+        ).to(device)    
 
-        pipe = StableDiffusionPipeline.from_pretrained(args.model_path, torch_dtype=torch.float16).to(device)
+        if model_path != "CompVis/stable-diffusion-v1-4": 
+            text_encoder = CLIPTextModel.from_pretrained(args.model_path, subfolder="text_encoder", revision=False).to("cuda")
+            tokenizer = CLIPTokenizer.from_pretrained(args.model_path, subfolder="tokenizer")
+            pipe.text_encoder = text_encoder
+            pipe.tokenizer = tokenizer
+        pipe.safety_concept = args.safety_concept
 
         for i in range(args.num_train_images):
             while True:
-                output = pipe(prompt=args.prompt)
+                if(args.sld_config == "none"):
+                    out = pipe(prompt=args.prompt, generator=gen, sld_guidance_scale=0)
+                elif(args.sld_config == "weak"):
+                    out = pipe(prompt=args.prompt, generator=gen,
+                    sld_warmup_steps=15,
+                    sld_guidance_scale=200,
+                    sld_threshold=0.0,
+                    sld_momentum_scale=0.0)
+                elif(args.sld_config == "medium"):
+                    out = pipe(prompt=args.prompt, generator=gen,
+                    sld_warmup_steps=10,
+                    sld_guidance_scale=1000,
+                    sld_threshold=0.01,
+                    sld_momentum_scale=0.3,
+                    sld_mom_beta=0.4)
+                elif(args.sld_config == "strong"):
+                    out = pipe(prompt=args.prompt, generator=gen,
+                    sld_warmup_steps=7,
+                    sld_guidance_scale=2000,
+                    sld_threshold=0.025,
+                    sld_momentum_scale=0.5,
+                    sld_mom_beta=0.7)
+                elif(args.sld_config == "max"):
+                    out = pipe(prompt=args.prompt, generator=gen,
+                    sld_warmup_steps=0,
+                    sld_guidance_scale=5000,
+                    sld_threshold=1.0,
+                    sld_momentum_scale=0.5,
+                    sld_mom_beta=0.7)
+
                 image = output.images[0]
                 nsfw = output.nsfw_content_detected
                 #check if nsfw is a list

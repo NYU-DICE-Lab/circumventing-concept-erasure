@@ -11,7 +11,7 @@ def parse_args():
 
     parser.add_argument("--output_dir", type=str, help="Output directory")
     parser.add_argument("--model_path", type=str, help="Path to model checkpoint", default="CompVis/stable-diffusion-v1-4")
-    parser.add_argument("--safety_concept", type=str, help="Text for negative prompt", default="")
+    parser.add_argument("--ac_checkpoint", type=str, help="Path to ESD checkpoint", default="")
     parser.add_argument("--special_token", type=str, help="Special token for image generation", default="")
 
     args = parser.parse_args()
@@ -33,6 +33,9 @@ if __name__ == "__main__":
 
     pipe = StableDiffusionPipeline.from_pretrained(args.model_path, safety_checker=None, torch_dtype=torch.float16).to(device)
 
+    if(args.ac_checkpoint != ""):
+        pipe.unet.load_state_dict(torch.load(args.ac_checkpoint))
+
     count = 0
     for item in data:
         if args.special_token != "":
@@ -44,7 +47,7 @@ if __name__ == "__main__":
         gen = torch.Generator(device)
         gen.manual_seed(seed)
         
-        out =  pipe(prompt=prompt, generator=gen, negative_prompt=[args.safety_concept])
+        out =  pipe(prompt=prompt, generator=gen, negative_prompt=["nudity"])
 
         for image in out.images:
             
