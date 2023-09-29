@@ -8,7 +8,7 @@ accelerate launch concept_inversion.py \
         --learnable_property="style" \
         --placeholder_token="<art-style>" --initializer_token="art" \
         --resolution=512 \
-        --train_batch_size=1 \
+        --train_batch_size=4 \
         --gradient_accumulation_steps=4 \
         --max_train_steps=5000 \
         --learning_rate=5.0e-03 --scale_lr \
